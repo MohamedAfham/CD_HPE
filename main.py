@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from utils.inference import get_max_preds
 from utils.loss import JointsMSELoss, JointsKLLoss
 from models.stacked_hg import PoseNet
+from models.simple_baseline import PoseResNet, get_pose_net
 from datasets.slp_dataset import SLP, SLPWeak
 from utils.evaluate import accuracy
 from utils.avg_metrics import AverageMeter
@@ -50,11 +51,22 @@ def parse_option():
     parser.add_argument('--use_target_weight', action='store_true', help='use target_weight for loss computation')
 
     # dataset
-    parser.add_argument('--model', type=str, default='resnet12')
+    parser.add_argument('--model', type=str, default='stacked_hg', choices = ['stacked_hg', 'simple_baseline'])
     parser.add_argument('--sigma', type=int, default=2, help='sigma value for generating heatmaps')
-    parser.add_argument('--heatmap', type=str, default='64 64', help='Size of the heatmap')
+    parser.add_argument('--heatmap', type=str, default='64,64', help='Size of the heatmap')
     parser.add_argument('--n_stack', type=int, default=8, help='Number of stacks in Hourglass model')
     parser.add_argument("--wandb_run", default=None, help="Name of the WandB run")
+    
+    # simple baseline
+    parser.add_argument('--init_weights', action='store_true', help='initialize pretrained backbone weights')
+    parser.add_argument('--pretrained', type=str, default='', help='path for pretrained backbone')
+    parser.add_argument('--num_layers', type=int, default=18, choices=[18, 34, 50, 101, 152], help='number of layers in backbone')
+    parser.add_argument('--num_deconv_layers', type=int, default=3, help='Deconv layers in simple baseline')
+    parser.add_argument('--num_deconv_filters', type=list, default=[256, 256, 256], help='list of deconv filters')
+    parser.add_argument('--num_deconv_kernels', type=list, default=[4, 4, 4], help='list of deconv kernels')
+    parser.add_argument('--num_joints', type=int, default=14, help='number of joints to predict')
+    parser.add_argument('--final_conv_kernel', type=int, default=1, help='number of conv kernels after decoder')
+    parser.add_argument('--deconv_with_bias', type=bool, default=True, help='Biased used during deconvolution')
     
     # cosine annealing
     parser.add_argument('--cosine', action='store_true', help='using cosine annealing')
@@ -64,13 +76,12 @@ def parse_option():
 
     opt = parser.parse_args()
 
-
     # set the path according to the environment
     if not opt.model_path:
         opt.model_path = './results'
 
     iterations = opt.lr_decay_epochs.split(',')
-    opt.heatmap_size = list(map(int,opt.heatmap.split()))
+    opt.heatmap_size = list(map(int,opt.heatmap.split(',')))
     opt.lr_decay_epochs = list([])
     for it in iterations:
         opt.lr_decay_epochs.append(int(it))
@@ -95,9 +106,10 @@ def main():
 
     args = parse_option()
     
-    wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
+#     wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
     
-    transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
+#     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
+    transform = transforms.ToTensor()
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
@@ -112,11 +124,16 @@ def main():
     val_cover1_loader = DataLoader(SLP(val_cover1_file, transform, args), batch_size=args.batch_size, shuffle=True)
     val_cover2_loader = DataLoader(SLP(val_cover2_file, transform, args), batch_size=args.batch_size, shuffle=True)
     
-    model = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
-    wandb.watch(model)
+    if args.model == 'stacked_hg':
+        model = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
+    else:
+        model = get_pose_net(args, is_train = True)
+        model.conv1 = Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        model = model.to(args.device)
+#     wandb.watch(model)
     
-#     criterion = JointsMSELoss(use_target_weight=args.use_target_weight).to(args.device)
-    criterion = JointsKLLoss().to(args.device)
+    criterion = JointsMSELoss(use_target_weight=args.use_target_weight).to(args.device)
+#     criterion = JointsKLLoss().to(args.device)
     
     if args.adam:
         optimizer = torch.optim.Adam(model.parameters(),
@@ -144,10 +161,10 @@ def main():
         
         val_acc_5 = (val_acc_5_cover1 + val_acc_5_cover2)/2
         
-        wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
-                   "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
-                   "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
-                   "Val Accuracy@0.5": val_acc_5})
+#         wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
+#                    "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
+#                    "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
+#                    "Val Accuracy@0.5": val_acc_5})
         
         if val_acc_5 > max_val_acc:
             best_epoch = epoch
@@ -194,8 +211,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         target_weight = target_weight.to(args.device)
         batch_size = input.shape[0]
         
-
-        pose = model(input)[0][:, -1]
+        if args.model == 'stacked_hg':
+            pose = model(input)[0][:, -1]
+        else:
+            pose = model(input)
 
         loss = criterion(pose, target, target_weight)
 
@@ -256,9 +275,12 @@ def validate(val_loader, model, epoch, args):
             target_weight = target_weight.to(args.device)
 
             batch_size = input.shape[0]
-            pose = model(input)[0]
+            if args.model == 'stacked_hg':
+                pose = model(input)[0]
+                output = pose.detach().cpu().numpy()[:, -1]
+            else:
+                output = model(input).detach().cpu().numpy()
            
-            output = pose.detach().cpu().numpy()[:, -1]
             target = target.detach().cpu().numpy()
             acc_5, avg_acc_5, cnt, pred = accuracy(output, target, thr=0.5)
             acc_2, avg_acc_2, cnt, pred = accuracy(output, target, thr=0.2)
