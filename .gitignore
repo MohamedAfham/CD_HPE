@@ -1,0 +1,12 @@
+.ipynb_checkpoints/
+results/
+SLP.zip
+SLP_MICCAI19.zip
+Untitled.ipynb
+data/SLP_VIPCup/train
+data/SLP_VIPCup/valid
+data/SLP_VIPCup/test1
+valid.zip
+wandb/
+train.zip
+test1.zip
