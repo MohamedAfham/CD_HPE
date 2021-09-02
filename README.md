@@ -26,13 +26,13 @@ The lable matrix `joints_gt_<modality>.mat` has the format  `<x,y,if_occluded>` 
 
 Download dataset from codalab. Create a folder named data/SLP_VIPCup. Unzip the data inside data/SLP_VIPCup/
 The directory should look like
-`CD_HPE/ \
+CD_HPE/ \
     data/ \
         SLP_VIPCup/ \
             train/ \
             test1/ \
             val/ \
-`
+
 In `filelists/write_to_filelist.py` change `DATA_DIR` based on where the dataset is stored. Run `python filelists/write_to_filelist.py` which will create `.json` dictionary files for the dataset.
 
 ## Train
