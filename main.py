@@ -110,7 +110,8 @@ def main():
     #wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
     
     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
-    uncover_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt())])
+    cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
+    cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
@@ -118,7 +119,7 @@ def main():
     val_cover1_file = os.path.join(FILELIST_DIR, 'valid_cover1.json')
     val_cover2_file = os.path.join(FILELIST_DIR, 'valid_cover2.json')
 
-    train_uncover_loader = DataLoader(SLP(train_uncover_file, (uncover_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
+    train_uncover_loader = DataLoader(SLP(train_uncover_file, (cover1_transform, cover2_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover1_file, transform), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover2_file, transform), batch_size=args.batch_size, shuffle=True)
 
@@ -202,17 +203,18 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     end = time.time()
-    for i, ((image, image_gen), target, target_weight) in enumerate(train_loader):
+    for i, ((image, image_cover1, image_cover2), target, target_weight) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
         image = image.to(args.device)
-        image_gen = image_gen.to(args.device)
-        input = torch.cat((image, image_gen))
+        image_cover1 = image_cover1.to(args.device)
+        image_cover2 = image_cover2.to(args.device)
+        input = torch.cat((image, image_cover1, image_cover2))
         target = target.to(args.device)
         target_weight = target_weight.to(args.device)
-        target, target_weight = torch.cat((target, target)), torch.cat((target_weight, target_weight)) 
+        target, target_weight = torch.cat((target, target, target)), torch.cat((target_weight, target_weight, target_weight)) 
         batch_size = input.shape[0]
         
         if args.model == 'stacked_hg':

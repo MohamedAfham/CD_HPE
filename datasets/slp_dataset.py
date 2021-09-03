@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 class SLP(Dataset):
     def __init__(self, data_file, transform, args, isTrain = None):
         with open(data_file, 'r') as f:
-          self.data = json.load(f)
+            self.data = json.load(f)
 
         if isTrain:
-            self.gen_transform, self.transform = transform[0], transform[1]
+            self.cover1_transform, self.cover2_transform, self.transform = transform[0], transform[1], transform[2]
         else:
             self.transform = transform
         self.args = args
@@ -27,8 +27,10 @@ class SLP(Dataset):
         
         if self.isTrain:
             im_cvt = (255 * cv2.cvtColor(plt.imread(img_path), cv2.COLOR_GRAY2RGB)).astype('uint8')
-            image_gen = self.gen_transform(im_cvt)
-            image_gen = image_gen[0].unsqueeze(0)
+            image_cover1 = self.cover1_transform(im_cvt)
+            image_cover1 = image_cover1[0].unsqueeze(0)
+            image_cover2 = self.cover2_transform(im_cvt)
+            image_cover2 = image_cover2[0].unsqueeze(0)
         
         image = self.transform(image)
         keypoints = np.array(self.data[idx]['key_points'])
@@ -44,7 +46,7 @@ class SLP(Dataset):
         target, target_weight = self.generate_target(joints_3d, joints_3d_vis, self.args)
 
         if self.isTrain:
-            return (image, image_gen), target, target_weight
+            return (image, image_cover1, image_cover2), target, target_weight
         else:
             return image, target, target_weight
     
