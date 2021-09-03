@@ -69,6 +69,10 @@ def parse_option():
     parser.add_argument('--final_conv_kernel', type=int, default=1, help='number of conv kernels after decoder')
     parser.add_argument('--deconv_with_bias', type=bool, default=True, help='Biased used during deconvolution')
     
+    # cycle GAN
+    parser.add_argument('--checkpoint1_dir', type=str, default='', help='Checkpoint of cycleGAN trained model (cover1)')
+    parser.add_argument('--checkpoint2_dir', type=str, default='', help='Checkpoint of cycleGAN trained model (cover2)')
+    
     # cosine annealing
     parser.add_argument('--cosine', action='store_true', help='using cosine annealing')
 
@@ -110,7 +114,8 @@ def main():
     wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
     
     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
-    uncover_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt())])
+    cover1_transform = transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt())])
+    
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
@@ -118,7 +123,7 @@ def main():
     val_cover1_file = os.path.join(FILELIST_DIR, 'valid_cover1.json')
     val_cover2_file = os.path.join(FILELIST_DIR, 'valid_cover2.json')
 
-    train_uncover_loader = DataLoader(SLP(train_uncover_file, (uncover_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
+    train_uncover_loader = DataLoader(SLP(train_uncover_file, (cover1_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover1_file, transform), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover2_file, transform), batch_size=args.batch_size, shuffle=True)
 
