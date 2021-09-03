@@ -6,7 +6,7 @@ from cyclegan_transform.models.test_model import TestModel
 import torch
 
 class get_cyclegan_opt:
-    def __init__(self, checkpoint_dir= '/home/mohamedafham/notebooks/projects/CD_HPE/cyclegan_transform/checkpoints', name= 'InbedPose_CyleGAN'):
+    def __init__(self, checkpoint_dir= './cyclegan_transform/checkpoints', name= 'InbedPose_CyleGAN'):
         self.aspect_ratio=1.0
         self.batch_size=1
         self.checkpoints_dir=checkpoint_dir
