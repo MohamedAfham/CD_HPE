@@ -147,6 +147,8 @@ class PoseResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.flatten = nn.Flatten()
 
         # used for deconv layers
         self.deconv_layers = self._make_deconv_layer(
@@ -230,11 +232,15 @@ class PoseResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        
+        feats = x
+        feats = self.avgpool(feats)
+        feats = self.flatten(feats)
 
         x = self.deconv_layers(x)
         x = self.final_layer(x)
 
-        return x
+        return x, feats
 
     def init_weights(self, pretrained=''):
         if os.path.isfile(pretrained):

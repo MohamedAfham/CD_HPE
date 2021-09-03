@@ -2,15 +2,21 @@ from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
 import json
+import cv2
+import matplotlib.pyplot as plt
 
 
 class SLP(Dataset):
-    def __init__(self, data_file, transform, args):
+    def __init__(self, data_file, transform, args, isTrain = None):
         with open(data_file, 'r') as f:
           self.data = json.load(f)
 
-        self.transform = transform
+        if isTrain:
+            self.gen_transform, self.transform = transform[0], transform[1]
+        else:
+            self.transform = transform
         self.args = args
+        self.isTrain = isTrain
 
     def __len__(self):
         return len(self.data)
@@ -18,6 +24,12 @@ class SLP(Dataset):
     def __getitem__(self, idx):
         img_path = self.data[idx]['file_name']
         image = Image.open(img_path)
+        
+        if self.isTrain:
+            im_cvt = (255 * cv2.cvtColor(plt.imread(img_path), cv2.COLOR_GRAY2RGB)).astype('uint8')
+            image_gen = self.gen_transform(im_cvt)
+            image_gen = image_gen[0].unsqueeze(0)
+        
         image = self.transform(image)
         keypoints = np.array(self.data[idx]['key_points'])
         joints_vis = np.absolute(keypoints[:, 2] - 1)
@@ -31,8 +43,10 @@ class SLP(Dataset):
 
         target, target_weight = self.generate_target(joints_3d, joints_3d_vis, self.args)
 
-        return image, target, target_weight
-
+        if self.isTrain:
+            return (image, image_gen), target, target_weight
+        else:
+            return image, target, target_weight
     
     def generate_target(self, joints, joints_vis, args):
         '''

@@ -28,6 +28,7 @@ from models.simple_baseline import PoseResNet, get_pose_net
 from datasets.slp_dataset import SLP, SLPWeak
 from utils.evaluate import accuracy
 from utils.avg_metrics import AverageMeter
+from cyclegan_transform.cyclegan_transform import cyclegan_transform, get_cyclegan_opt
 import wandb
 
 FILELIST_DIR = "filelists"
@@ -106,10 +107,10 @@ def main():
 
     args = parse_option()
     
-#     wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
+    wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
     
-#     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
-    transform = transforms.ToTensor()
+    transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
+    uncover_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt())])
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
@@ -117,12 +118,12 @@ def main():
     val_cover1_file = os.path.join(FILELIST_DIR, 'valid_cover1.json')
     val_cover2_file = os.path.join(FILELIST_DIR, 'valid_cover2.json')
 
-    train_uncover_loader = DataLoader(SLP(train_uncover_file, transform, args), batch_size=args.batch_size, shuffle=True)
+    train_uncover_loader = DataLoader(SLP(train_uncover_file, (uncover_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover1_file, transform), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover2_file, transform), batch_size=args.batch_size, shuffle=True)
 
-    val_cover1_loader = DataLoader(SLP(val_cover1_file, transform, args), batch_size=args.batch_size, shuffle=True)
-    val_cover2_loader = DataLoader(SLP(val_cover2_file, transform, args), batch_size=args.batch_size, shuffle=True)
+    val_cover1_loader = DataLoader(SLP(val_cover1_file, transform, args, isTrain = False), batch_size=args.batch_size, shuffle=True)
+    val_cover2_loader = DataLoader(SLP(val_cover2_file, transform, args, isTrain = False), batch_size=args.batch_size, shuffle=True)
     
     if args.model == 'stacked_hg':
         model = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
@@ -130,7 +131,7 @@ def main():
         model = get_pose_net(args, is_train = True)
         model.conv1 = Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         model = model.to(args.device)
-#     wandb.watch(model)
+    wandb.watch(model)
     
     criterion = JointsMSELoss(use_target_weight=args.use_target_weight).to(args.device)
 #     criterion = JointsKLLoss().to(args.device)
@@ -149,7 +150,7 @@ def main():
     max_val_acc = 0
     best_epoch = 0
     for epoch in range(1, args.epochs + 1):
-        print("==> training...")
+        print("==> Training=====================>")
 
         train_acc_5, train_acc_2, train_loss = train(train_uncover_loader, model, criterion, optimizer, epoch, args)
         
@@ -161,10 +162,10 @@ def main():
         
         val_acc_5 = (val_acc_5_cover1 + val_acc_5_cover2)/2
         
-#         wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
-#                    "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
-#                    "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
-#                    "Val Accuracy@0.5": val_acc_5})
+        wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
+                   "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
+                   "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
+                   "Val Accuracy@0.5": val_acc_5})
         
         if val_acc_5 > max_val_acc:
             best_epoch = epoch
@@ -201,20 +202,23 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     end = time.time()
-    for i, (input, target, target_weight) in enumerate(train_loader):
+    for i, ((image, image_gen), target, target_weight) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
-        input = input.to(args.device)
+        image = image.to(args.device)
+        image_gen = image_gen.to(args.device)
+        input = torch.cat((image, image_gen))
         target = target.to(args.device)
         target_weight = target_weight.to(args.device)
+        target, target_weight = torch.cat((target, target)), torch.cat((target_weight, target_weight)) 
         batch_size = input.shape[0]
         
         if args.model == 'stacked_hg':
             pose = model(input)[0][:, -1]
         else:
-            pose = model(input)
+            pose, pose_feats = model(input)
 
         loss = criterion(pose, target, target_weight)
 
@@ -223,8 +227,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         acc_5, avg_acc_5, cnt, pred = accuracy(output_acc, target_acc, thr=0.5)
         acc_2, avg_acc_2, cnt, pred = accuracy(output_acc, target_acc, thr=0.2)
 
-        accuracy_5.update(avg_acc_5, cnt)
-        accuracy_2.update(avg_acc_2, cnt)
+        accuracy_5.update(avg_acc_5 * 100, cnt)
+        accuracy_2.update(avg_acc_2 * 100, cnt)
         
 
         # compute gradient and do update step
@@ -279,14 +283,15 @@ def validate(val_loader, model, epoch, args):
                 pose = model(input)[0]
                 output = pose.detach().cpu().numpy()[:, -1]
             else:
-                output = model(input).detach().cpu().numpy()
+                pose, pose_feats = model(input)
+                output = pose.detach().cpu().numpy()
            
             target = target.detach().cpu().numpy()
             acc_5, avg_acc_5, cnt, pred = accuracy(output, target, thr=0.5)
             acc_2, avg_acc_2, cnt, pred = accuracy(output, target, thr=0.2)
 
-            accuracy_5.update(avg_acc_5, cnt)
-            accuracy_2.update(avg_acc_2, cnt)
+            accuracy_5.update(avg_acc_5 * 100, cnt)
+            accuracy_2.update(avg_acc_2 * 100, cnt)
             
             
             # measure elapsed time

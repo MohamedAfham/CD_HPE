@@ -15,3 +15,6 @@ valid.zip
 wandb/
 train.zip
 test1.zip
+cyclegan_transform/__pycache__/
+cyclegan_transform/.ipynb_checkpoints/
+cyclegan_transform/transform.ipynb
