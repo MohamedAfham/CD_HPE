@@ -4,6 +4,7 @@ import numpy as np
 import json
 import cv2
 import matplotlib.pyplot as plt
+import torch
 
 
 class SLP(Dataset):
@@ -28,9 +29,9 @@ class SLP(Dataset):
         if self.isTrain:
             im_cvt = (255 * cv2.cvtColor(plt.imread(img_path), cv2.COLOR_GRAY2RGB)).astype('uint8')
             image_cover1 = self.cover1_transform(im_cvt)
-            image_cover1 = image_cover1[0].unsqueeze(0)
+            image_cover1 = torch.from_numpy(cv2.cvtColor(image_cover1.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
             image_cover2 = self.cover2_transform(im_cvt)
-            image_cover2 = image_cover2[0].unsqueeze(0)
+            image_cover2 = torch.from_numpy(cv2.cvtColor(image_cover2.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
         
         image = self.transform(image)
         keypoints = np.array(self.data[idx]['key_points'])
