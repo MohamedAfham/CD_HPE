@@ -107,8 +107,8 @@ def main():
 
     args = parse_option()
     
-    #wandb.init(project="In-bed-pose-SLP", name=args.wandb_run)
-    
+    wandb.init(project='gpt3.123', name=args.wandb_run)
+
     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
     cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
     cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
@@ -132,7 +132,7 @@ def main():
         model = get_pose_net(args, is_train = True)
         model.conv1 = Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         model = model.to(args.device)
-    #wandb.watch(model)
+    wandb.watch(model)
     
     criterion = JointsMSELoss(use_target_weight=args.use_target_weight).to(args.device)
 #     criterion = JointsKLLoss().to(args.device)
@@ -163,10 +163,10 @@ def main():
         
         val_acc_5 = (val_acc_5_cover1 + val_acc_5_cover2)/2
         
-        #wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
-        #           "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
-        #           "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
-        #           "Val Accuracy@0.5": val_acc_5})
+        wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
+                   "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
+                   "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
+                   "Val Accuracy@0.5": val_acc_5})
         
         if val_acc_5 > max_val_acc:
             best_epoch = epoch
