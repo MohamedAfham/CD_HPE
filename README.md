@@ -24,7 +24,20 @@ The lable matrix `joints_gt_<modality>.mat` has the format  `<x,y,if_occluded>` 
 
 ## Dataset
 
-Download dataset from codalab. Create a folder named data/SLP_VIPCup. Unzip the data inside data/SLP_VIPCup/
+Download dataset from codalab. 
+```
+wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/train.zip
+wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/valid.zip
+wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/test1.zip
+```
+
+Create a folder named data/SLP_VIPCup. Unzip the data inside data/SLP_VIPCup/
+```
+unzip train.zip data/SLP_VIPCup/
+unzip valid.zip data/SLP_VIPCup/
+unzip test1.zip data/SLP_VIPCup/
+```
+
 The directory should look like
 
 ```
