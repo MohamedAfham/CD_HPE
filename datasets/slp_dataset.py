@@ -109,7 +109,7 @@ class SLP(Dataset):
 class SLPWeak(Dataset):
     def __init__(self, data_file, transform=None):
         with open(data_file, 'r') as f:
-          self.data = json.load(f)
+            self.data = json.load(f)
 
         self.transform = transform
 

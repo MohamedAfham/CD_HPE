@@ -24,18 +24,18 @@ The lable matrix `joints_gt_<modality>.mat` has the format  `<x,y,if_occluded>` 
 
 ## Dataset
 
-Download dataset from codalab. 
+Create a folder named data/SLP_VIPCup.
 ```
-wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/train.zip
-wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/valid.zip
-wget https://coe.northeastern.edu/Research/AClab/SLP_VIPCup/test1.zip
+mkdir data
+cd data 
+mkdir SLP_VIPCup
+cd ..
 ```
 
-Create a folder named data/SLP_VIPCup. Unzip the data inside data/SLP_VIPCup/
+Download dataset from codalab. Unzip the data inside data/SLP_VIPCup/ by running:
+
 ```
-unzip train.zip data/SLP_VIPCup/
-unzip valid.zip data/SLP_VIPCup/
-unzip test1.zip data/SLP_VIPCup/
+source dowload_data.sh
 ```
 
 The directory should look like
@@ -49,8 +49,25 @@ CD_HPE/
             val/
 ```
 
-In `filelists/write_to_filelist.py` change `DATA_DIR` based on where the dataset is stored. Run `python filelists/write_to_filelist.py` which will create `.json` dictionary files for the dataset.
+Run the following to create the required `.json` files for the dataset
+
+```
+cd filelists
+source create_filelist.sh
+cd ..
+```
 
 ## Train
 
-Run `python main.py --adam --use_target_weight --model stacked_hg --print_freq 50 --batch_size 10 --wandb_run Name/of/wandb/run` to start the training.
+### For Learning Stage 01 (Standard Supervision)
+
+```
+python train_supervised.py --adam --use_target_weight --model stacked_hg --print_freq 50 --batch_size 10 --wandb_run Name/of/wandb/run
+```
+
+### For Learning Stage 02 (Knowledge Distillation)
+
+```
+python train_distillation.py --adam --best_path path/to/best/model --model stacked_hg --print_freq 50 --batch_size 8 --lr 1e-4 --wandb_run Name/of/wandb/run
+```
+
