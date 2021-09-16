@@ -27,9 +27,7 @@ The lable matrix `joints_gt_<modality>.mat` has the format  `<x,y,if_occluded>` 
 Create a folder named data/SLP_VIPCup.
 ```
 mkdir data
-cd data 
-mkdir SLP_VIPCup
-cd ..
+mkdir data/SLP_VIPCup
 ```
 
 Download dataset from codalab. Unzip the data inside data/SLP_VIPCup/ by running:
