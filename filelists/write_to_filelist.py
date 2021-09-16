@@ -24,7 +24,7 @@ def sort_by_img_name(x):
 
 
 args = parse_option()
-DATA_DIR = "/home/mohamedafham/notebooks/projects/CD_HPE/data/SLP_VIPCup"
+DATA_DIR = "../data/SLP_VIPCup"
 
 if args.split == 'train':
     if args.pose_config == 'uncover':
@@ -50,9 +50,14 @@ dir_list_sorted = sorted(dir_list, key=sort_by_subject)
 def get_filelist(train_uncover_dirs, args):
     img_dict_list = []
     for dir_path in dir_list_sorted:
-        
+
+        #if 'test1' not in dir_path:continue
+        #print(args.pose_config, dir_path)
+        #print(glob.glob(os.path.join(dir_path, "IR", args.pose_config, '*.png')))
+        #print(dir_path, os.path.join(dir_path, "IR", args.pose_config, '*.png'), glob.glob(os.path.join(dir_path, "IR", args.pose_config, '*.png')))
         img_dirs = sorted(glob.glob(os.path.join(dir_path, "IR", args.pose_config, '*.png')), key = sort_by_img_name)
-        
+        #print(img_dirs)
+        #print('done')
         if args.split == 'train':
             if args.pose_config == 'cover1' or args.pose_config == 'cover2':
                 joints_dir = None
@@ -81,7 +86,7 @@ def get_filelist(train_uncover_dirs, args):
             else:
                 joints = None
                 
-            img_dict = {'file_name':img_dir , 'key_points':joints}
+            img_dict = {'file_name':img_dir[3:] , 'key_points':joints}
             img_dict_list.append(img_dict)
             
     return img_dict_list  

@@ -1,3 +1,7 @@
+args.py
+__pycache__/
+datasets/__pycache__/
+models/__pycache__/
 filelists/viz.ipynb
 utils/__pycache__
 .ipynb_checkpoints/
@@ -12,3 +16,6 @@ valid.zip
 wandb/
 train.zip
 test1.zip
+cyclegan_transform/__pycache__/
+cyclegan_transform/.ipynb_checkpoints/
+cyclegan_transform/transform.ipynb
