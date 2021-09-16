@@ -35,7 +35,7 @@ cd ..
 Download dataset from codalab. Unzip the data inside data/SLP_VIPCup/ by running:
 
 ```
-source dowload_data.sh
+source download_data.sh
 ```
 
 The directory should look like
