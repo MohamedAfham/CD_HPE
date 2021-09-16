@@ -60,12 +60,12 @@ cd ..
 ### For Learning Stage 01 (Standard Supervision)
 
 ```
-python train_supervised.py --adam --use_target_weight --model stacked_hg --print_freq 50 --batch_size 10 --wandb_run Name/of/wandb/run
+python train_supervised.py --adam --use_target_weight --model stacked_hg --print_freq 50 --batch_size 3 --wandb_run Name/of/wandb/run
 ```
 
 ### For Learning Stage 02 (Knowledge Distillation)
 
 ```
-python train_distillation.py --adam --best_path path/to/best/model --model stacked_hg --print_freq 50 --batch_size 8 --lr 1e-4 --wandb_run Name/of/wandb/run
+python train_distillation.py --adam --best_path path/to/best/model --model stacked_hg --print_freq 50 --batch_size 4 --lr 1e-4 --wandb_run Name/of/wandb/run
 ```
 
