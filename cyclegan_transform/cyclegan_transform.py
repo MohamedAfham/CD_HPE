@@ -69,7 +69,7 @@ class cyclegan_transform:
 
         converted_img= (converted_img+1.)/2. # torch tensor,shape: (3, 256, 256): range: [0, 1]
 
-        return converted_img
+        return converted_img.cpu()
 
     def pre_transform_for_cyclegan(self, opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
         transform_list = []
