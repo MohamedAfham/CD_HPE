@@ -29,6 +29,7 @@ from datasets.slp_dataset import SLP, SLPWeak
 from utils.evaluate import accuracy
 from utils.avg_metrics import AverageMeter
 from cyclegan_transform.cyclegan_transform import cyclegan_transform, get_cyclegan_opt
+from  extreme_transform.extreme_transform import extreme_transform
 import wandb
 
 FILELIST_DIR = "filelists"
@@ -110,8 +111,10 @@ def main():
     wandb.init(project='gpt3.123', name=args.wandb_run)
 
     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
-    cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
-    cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
+    #cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1')), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
+    #cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2')), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
+    cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1')), extreme_transform()])
+    cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2')), extreme_transform()])
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
@@ -139,8 +142,7 @@ def main():
     
     if args.adam:
         optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=args.lr,
-                                     weight_decay=0.0005)
+                                     lr=args.lr) #, weight_decay=0.0005)
     else:
         optimizer = optim.SGD(model.parameters(),
                               lr=args.lr,
@@ -148,7 +150,8 @@ def main():
                               weight_decay=args.weight_decay)
     
     
-    max_val_acc = 0
+    max_val5_acc = 0
+    max_val2_acc = 0 
     best_epoch = 0
     for epoch in range(1, args.epochs + 1):
         print("==> Training=====================>")
@@ -162,16 +165,28 @@ def main():
         val_acc_5_cover2, val_acc_2_cover2 = validate(val_cover2_loader, model, epoch, args)
         
         val_acc_5 = (val_acc_5_cover1 + val_acc_5_cover2)/2
-        
+        val_acc_2 = (val_acc_2_cover1 + val_acc_2_cover2)/2        
+
         wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
                    "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
                    "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
-                   "Val Accuracy@0.5": val_acc_5})
+                   "Val Accuracy@0.5": val_acc_5, "Val Accuracy@0.2": val_acc_2})
         
-        if val_acc_5 > max_val_acc:
+        if val_acc_5 > max_val5_acc:
             best_epoch = epoch
-            print('==> Saving Best Model......')
-            max_val_acc = val_acc_5
+            print('==> Saving Best Model......(according to PCK0.5)')
+            max_val5_acc = val_acc_5
+            state = {
+                'epoch': best_epoch,
+                'model': model.state_dict()
+            }
+            save_file = os.path.join(args.save_folder, 'best_model.pth')
+            torch.save(state, save_file)
+
+        elif val_acc_2 > max_val2_acc:
+            best_epoch = epoch
+            print('==> Saving Best Model......(according to PCK0.2)')
+            max_val2_acc = val_acc_2
             state = {
                 'epoch': best_epoch,
                 'model': model.state_dict()
@@ -212,6 +227,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         image_cover1 = image_cover1.to(args.device)
         image_cover2 = image_cover2.to(args.device)
         input = torch.cat((image, image_cover1, image_cover2))
+        #[image, image_cover1, image_cover2]
         target = target.to(args.device)
         target_weight = target_weight.to(args.device)
         target, target_weight = torch.cat((target, target, target)), torch.cat((target_weight, target_weight, target_weight)) 
