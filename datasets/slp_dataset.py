@@ -13,7 +13,8 @@ class SLP(Dataset):
             self.data = json.load(f)
 
         if isTrain:
-            self.cover1_transform, self.cover2_transform, self.transform = transform[0], transform[1], transform[2]
+            self.cycleaug_cover1_transform, self.cycleaug_cover2_transform, self.extremeaug_cover1_transform, self.extremeaug_cover2_transform, self.transform = transform[0], transform[1], transform[2], transform[3], transform[4]
+            
         else:
             self.transform = transform
         self.args = args
@@ -28,11 +29,16 @@ class SLP(Dataset):
         
         if self.isTrain:
             im_cvt = (255 * cv2.cvtColor(plt.imread(img_path), cv2.COLOR_GRAY2RGB)).astype('uint8')
-            image_cover1 = self.cover1_transform(im_cvt)
-            image_cover1 = torch.from_numpy(cv2.cvtColor(image_cover1.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
-            image_cover2 = self.cover2_transform(im_cvt)
-            image_cover2 = torch.from_numpy(cv2.cvtColor(image_cover2.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
-        
+            cycimage_cover1 = self.cycleaug_cover1_transform(im_cvt)
+            cycimage_cover1 = torch.from_numpy(cv2.cvtColor(cycimage_cover1.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
+            cycimage_cover2 = self.cycleaug_cover2_transform(im_cvt)
+            cycimage_cover2 = torch.from_numpy(cv2.cvtColor(cycimage_cover2.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
+            
+            extrimage_cover1 = self.extremeaug_cover1_transform(im_cvt)
+            extrimage_cover1 = torch.from_numpy(cv2.cvtColor(extrimage_cover1.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)
+            extrimage_cover2 = self.extremeaug_cover2_transform(im_cvt)
+            extrimage_cover2 = torch.from_numpy(cv2.cvtColor(extrimage_cover2.permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2GRAY)).unsqueeze(0)        
+
         image = self.transform(image)
         keypoints = np.array(self.data[idx]['key_points'])
         joints_vis = np.absolute(keypoints[:, 2] - 1)
@@ -47,7 +53,7 @@ class SLP(Dataset):
         target, target_weight = self.generate_target(joints_3d, joints_3d_vis, self.args)
 
         if self.isTrain:
-            return (image, image_cover1, image_cover2), target, target_weight
+            return (image, cycimage_cover1, cycimage_cover2, extrimage_cover1, extrimage_cover2), target, target_weight
         else:
             return image, target, target_weight
     
