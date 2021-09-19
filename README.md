@@ -69,4 +69,4 @@ python train_supervised.py --adam --use_target_weight --model stacked_hg --print
 python train_distillation.py --adam --best_path path/to/best/model --model stacked_hg --print_freq 50 --batch_size 4 --lr 1e-4 --wandb_run Name/of/wandb/run
 ```
 
-Kindly refer to [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github.com/MohamedAfham/CD_HPE/blob/master/Reproduce_NFP_Undercover.ipynb) for reproducing our results.
+Kindly refer to [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/MohamedAfham/CD_HPE/blob/master/Reproduce_NFP_Undercover.ipynb) for reproducing our results.
