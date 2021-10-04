@@ -1,6 +1,4 @@
-# Cross Domain - Human Pose Estimation
-
-VIPCUP 2021 - Team NFP_Undercover
+# Towards Effective Cross Domain In-Bed Human Pose Estimation
 
 ## Pose Definition
 We follow the Leeds Sports Pose Dataset pose definition with 14 joints labeling, namely, 
