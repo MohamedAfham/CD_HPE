@@ -42,6 +42,7 @@ def parse_option():
     parser.add_argument('--save_freq', type=int, default=10, help='save frequency')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
     parser.add_argument('--epochs', type=int, default=100, help='number of training epochs')
+    parser.add_argument('--device', type=str, default='cpu', help='device')
 
     # optimization
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
@@ -96,11 +97,11 @@ def parse_option():
     if opt.adam:
         opt.model_name = '{}_useAdam'.format(opt.model_name)
 
-    opt.save_folder = os.path.join(opt.model_path, opt.model_name)
+    opt.save_folder = os.path.join(opt.model_path, opt.wandb_run)
     if not os.path.isdir(opt.save_folder):
         os.makedirs(opt.save_folder)
         
-    opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     return opt
 

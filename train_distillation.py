@@ -29,7 +29,6 @@ from datasets.slp_dataset import SLP, SLPWeak
 from utils.evaluate import accuracy
 from utils.avg_metrics import AverageMeter
 from cyclegan_transform.cyclegan_transform import cyclegan_transform, get_cyclegan_opt
-from  extreme_transform.extreme_transform import extreme_transform
 import wandb
 
 FILELIST_DIR = "filelists"
@@ -58,7 +57,8 @@ def parse_option():
     parser.add_argument('--sigma', type=int, default=2, help='sigma value for generating heatmaps')
     parser.add_argument('--heatmap', type=str, default='64,64', help='Size of the heatmap')
     parser.add_argument('--n_stack', type=int, default=8, help='Number of stacks in Hourglass model')
-    parser.add_argument("--wandb_run", default=None, help="Name of the WandB run")
+    parser.add_argument('--wandb_run', default=None, help="Name of the WandB run")
+    parser.add_argument('--best_path', type=str, default='', help='path to save model')
     
     # simple baseline
     parser.add_argument('--init_weights', action='store_true', help='initialize pretrained backbone weights')
@@ -96,6 +96,8 @@ def parse_option():
 
     if opt.adam:
         opt.model_name = '{}_useAdam'.format(opt.model_name)
+        
+    opt.model_name = '{}_distil'.format(opt.model_name)
 
     opt.save_folder = os.path.join(opt.model_path, opt.wandb_run)
     if not os.path.isdir(opt.save_folder):
@@ -112,65 +114,71 @@ def main():
     wandb.init(project='gpt3.123', name=args.wandb_run)
 
     transform = transforms.Compose([transforms.Resize((256, 256)),transforms.ToTensor()])
-    #cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1')), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
-    #cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2')), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
-    cycaug_cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1'))])
-    cycaug_cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2'))])
-
-    extremeaug_cover1_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover1')), extreme_transform(), extreme_transform()])
-    extremeaug_cover2_transform= transforms.Compose([transforms.ToTensor(), cyclegan_transform(cyclegan_opt= get_cyclegan_opt(name = 'InbedPose_CyleGAN_cover2')), extreme_transform(), extreme_transform()])
     
     train_uncover_file = os.path.join(FILELIST_DIR, 'train_uncover.json')
     train_cover1_file = os.path.join(FILELIST_DIR, 'train_cover1.json')
     train_cover2_file = os.path.join(FILELIST_DIR, 'train_cover2.json')
+    train_cover_file = os.path.join(FILELIST_DIR, 'train_cover.json')
     val_cover1_file = os.path.join(FILELIST_DIR, 'valid_cover1.json')
     val_cover2_file = os.path.join(FILELIST_DIR, 'valid_cover2.json')
 
-    train_uncover_loader = DataLoader(SLP(train_uncover_file, (cycaug_cover1_transform, cycaug_cover2_transform, extremeaug_cover1_transform, extremeaug_cover2_transform, transform), args, isTrain = True), batch_size=args.batch_size, shuffle=True)
     train_cover1_loader = DataLoader(SLPWeak(train_cover1_file, transform), batch_size=args.batch_size, shuffle=True)
-    train_cover1_loader = DataLoader(SLPWeak(train_cover2_file, transform), batch_size=args.batch_size, shuffle=True)
+    train_cover2_loader = DataLoader(SLPWeak(train_cover2_file, transform), batch_size=args.batch_size, shuffle=True)
+    train_cover_loader = DataLoader(SLPWeak(train_cover_file, transform), batch_size=args.batch_size, shuffle=True)
 
     val_cover1_loader = DataLoader(SLP(val_cover1_file, transform, args, isTrain = False), batch_size=args.batch_size, shuffle=True)
     val_cover2_loader = DataLoader(SLP(val_cover2_file, transform, args, isTrain = False), batch_size=args.batch_size, shuffle=True)
     
     if args.model == 'stacked_hg':
-        model = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
+        model_t = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
+        model_s = PoseNet(nstack=args.n_stack, inp_dim=256, oup_dim=14).to(args.device)
     else:
         model = get_pose_net(args, is_train = True)
         model.conv1 = Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         model = model.to(args.device)
-    wandb.watch(model)
+    wandb.watch(model_s)
+    
+    net_t = torch.load(args.best_path)
+    model_t.load_state_dict(net_t['model'])
+    model_t = model_t.to(args.device)
+    
+    net_s = torch.load(args.best_path)
+    model_s.load_state_dict(net_s['model'])
+    model_s = model_s.to(args.device)
+    
+    
+    
     
     criterion = JointsMSELoss(use_target_weight=args.use_target_weight).to(args.device)
 #     criterion = JointsKLLoss().to(args.device)
     
     if args.adam:
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=args.lr) #, weight_decay=0.0005)
+        optimizer = torch.optim.Adam(model_s.parameters(),
+                                     lr=args.lr,
+                                     weight_decay=0.0005)
     else:
-        optimizer = optim.SGD(model.parameters(),
+        optimizer = optim.SGD(model_s.parameters(),
                               lr=args.lr,
                               momentum=args.momentum,
                               weight_decay=args.weight_decay)
     
     
     max_val5_acc = 0
-    max_val2_acc = 0 
+    max_val2_acc = 0
     best_epoch = 0
     for epoch in range(1, args.epochs + 1):
         print("==> Training=====================>")
 
-        train_acc_5, train_acc_2, train_loss = train(train_uncover_loader, model, criterion, optimizer, epoch, args)
+        train_acc_5, train_acc_2, train_loss = train(train_cover_loader, model_t, model_s, criterion, optimizer, epoch, args)
         
         print("Validation Cover1=====================>")
-        val_acc_5_cover1, val_acc_2_cover1 = validate(val_cover1_loader, model, epoch, args)
+        val_acc_5_cover1, val_acc_2_cover1 = validate(val_cover1_loader, model_s, epoch, args)
         
         print("Validation Cover2=====================>")
-        val_acc_5_cover2, val_acc_2_cover2 = validate(val_cover2_loader, model, epoch, args)
+        val_acc_5_cover2, val_acc_2_cover2 = validate(val_cover2_loader, model_s, epoch, args)
         
         val_acc_5 = (val_acc_5_cover1 + val_acc_5_cover2)/2
-        val_acc_2 = (val_acc_2_cover1 + val_acc_2_cover2)/2        
-
+        val_acc_2 = (val_acc_2_cover1 + val_acc_2_cover2)/2
         wandb.log({"Train Accuracy@0.5": train_acc_5, "Train Accuracy@0.2": train_acc_2,
                    "Train Loss": train_loss, "Val Cover1 Accuracy@0.5": val_acc_5_cover1, "Val Cover1 Accuracy@0.2": val_acc_2_cover1,
                    "Val Cover2 Accuracy@0.5": val_acc_5_cover2, "Val Cover2 Accuracy@0.2": val_acc_2_cover2,
@@ -178,24 +186,23 @@ def main():
         
         if val_acc_5 > max_val5_acc:
             best_epoch = epoch
-            print('==> Saving Best Model......(according to PCK0.5)')
+            print('==> Saving Best Model......(PCK0.5)')
             max_val5_acc = val_acc_5
             state = {
                 'epoch': best_epoch,
-                'model': model.state_dict()
+                'model': model_s.state_dict()
             }
-            save_file = os.path.join(args.save_folder, 'best_model.pth')
+            save_file = os.path.join(args.save_folder, 'best_model_pck0.5.pth')
             torch.save(state, save_file)
-
         elif val_acc_2 > max_val2_acc:
             best_epoch = epoch
-            print('==> Saving Best Model......(according to PCK0.2)')
+            print('==> Saving Best Model......(PCK0.2)')
             max_val2_acc = val_acc_2
             state = {
                 'epoch': best_epoch,
-                'model': model.state_dict()
+                'model': model_s.state_dict()
             }
-            save_file = os.path.join(args.save_folder, 'best_model.pth')
+            save_file = os.path.join(args.save_folder, 'best_model_pck0.2.pth')
             torch.save(state, save_file)
 
 
@@ -204,46 +211,41 @@ def main():
             print('==> Saving...')
             state = {
                 'epoch': epoch,
-                'model': model.state_dict()
+                'model': model_s.state_dict()
             }
             save_file = os.path.join(args.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
             torch.save(state, save_file)
     
     
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, model_t, model_s, criterion, optimizer, epoch, args):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     accuracy_5 = AverageMeter()
     accuracy_2 = AverageMeter()
-    print(f'device : {args.device}')
+
     # switch to train mode
 
-    model.train()
+    model_t.eval()
+    model_s.train()
 
     end = time.time()
-    for i, ((image, image_cover1, image_cover2, extr_cover1, extr_cover2), target, target_weight) in enumerate(train_loader):
+    for i, image in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
-        image = image.to(args.device)
-        image_cover1 = image_cover1.to(args.device)
-        image_cover2 = image_cover2.to(args.device)
-        extr_cover1 = extr_cover1.to(args.device)
-        extr_cover2 = extr_cover2.to(args.device)
-
-        input = torch.cat((image, image_cover1, image_cover2, extr_cover1, extr_cover2))
-        #[image, image_cover1, image_cover2]
-        target = target.to(args.device)
-        target_weight = target_weight.to(args.device)
-        target, target_weight = torch.cat((target, target, target, target, target)), torch.cat((target_weight, target_weight, target_weight, target_weight, target_weight)) 
+        input = image.to(args.device)
         batch_size = input.shape[0]
         
         if args.model == 'stacked_hg':
-            pose = model(input)[0][:, -1]
+            with torch.no_grad():
+                target = model_t(input)[0][:, -1]
+            pose = model_s(input)[0][:, -1]
         else:
             pose, pose_feats = model(input)
+            
+        target_weight = None
 
         loss = criterion(pose, target, target_weight)
 
@@ -335,5 +337,3 @@ def validate(val_loader, model, epoch, args):
     
 if __name__ == '__main__':
     main()
-
-
