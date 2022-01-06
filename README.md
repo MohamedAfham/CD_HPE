@@ -1,4 +1,4 @@
-# Towards Effective Cross Domain In-Bed Human Pose Estimation
+# Towards Accurate Cross Domain In-Bed Human Pose Estimation
 
 ## Pose Definition
 We follow the Leeds Sports Pose Dataset pose definition with 14 joints labeling, namely, 
