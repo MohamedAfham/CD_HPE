@@ -1,5 +1,16 @@
 # Towards Accurate Cross Domain In-Bed Human Pose Estimation
 
+## Citation
+If you find our work or this repository useful, please consider giving a star :star: and citation.
+```bibtex
+@article{CD_HPE,
+      title={Towards Accurate Cross-Domain In-Bed Human Pose Estimation}, 
+      author={Mohamed Afham and Udith Haputhanthri and Jathurshan Pradeepkumar and Mithunjha Anandakumar and Ashwin De Silva and Chamira Edussooriya},
+      year={2021},
+      journal={arXiv preprint arXiv:2110.03578},
+}
+```
+
 ## Pose Definition
 We follow the Leeds Sports Pose Dataset pose definition with 14 joints labeling, namely, 
 
