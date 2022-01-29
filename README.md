@@ -1,4 +1,4 @@
-# Towards Accurate Cross Domain In-Bed Human Pose Estimation
+# Towards Accurate Cross Domain In-Bed Human Pose Estimation (Accepted at ICASSP 2022)
 
 ## Citation
 If you find our work or this repository useful, please consider giving a star :star: and citation.
